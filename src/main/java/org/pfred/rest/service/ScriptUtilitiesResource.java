@@ -100,7 +100,7 @@ public class ScriptUtilitiesResource {
         try {
             File seqF = new File(fullRunDirectory + "/" + seqFile);
             if(seqF.length() == 0){
-                return Response.status(Response.Status.OK).entity("sequence.fa is empty").build();
+                return Response.status(Response.Status.BAD_REQUEST).entity("sequence.fa is empty").build();
             }
             String results = ShellUtilities.readFileAsString(fullRunDirectory + "/" + seqFile);
             return Response.status(Response.Status.OK).entity(results).build();
