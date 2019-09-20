@@ -1,4 +1,0 @@
-This is a new file I just added;
-I will remove NewFileFromChris.txt in my own fork;
-
-repository on local file system can be added as remote repository

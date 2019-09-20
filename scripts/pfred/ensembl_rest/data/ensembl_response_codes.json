@@ -1,0 +1,30 @@
+{
+  "200": {
+    "name": "OK",
+    "description": "Request was a success. Only process data from the service when you receive this code"
+  },
+  "400": {
+    "name": "Bad Request",
+    "description": "Occurs during exceptional circumstances such as the service is unable to find an ID. Check if the response Content-type or Accept was JSON. If so the JSON object is an exception hash with the message keyed under error"
+  },
+  "403": {
+    "name": "Forbidden",
+    "description": "You are submitting far too many requests and have been temporarily forbidden access to the service. Wait and retry with a maximum of 15 requests per second."
+  },
+  "404": {
+    "name": "Not Found",
+    "description": "Indicates a badly formatted request. Check your URL"
+  },
+  "408": {
+    "name": "Timeout",
+    "description": "The request was not processed in time. Wait and retry later"
+  },
+  "429": {
+    "name": "Too Many Requests",
+    "description": "You have been rate-limited; wait and retry. The headers X-RateLimit-Reset, X-RateLimit-Limit and X-RateLimit-Remaining will inform you of how long you have until your limit is reset and what that limit was. If you get this response and have not exceeded your limit then check if you have made too many requests per second."
+  },
+  "503": {
+    "name": "Service Unavailable",
+    "description": "The service is temporarily down; retry after a pause"
+  }
+}
