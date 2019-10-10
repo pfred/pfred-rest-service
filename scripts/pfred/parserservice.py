@@ -3,12 +3,19 @@
 
 import argparse
 import logging
-from projectloghandler import ch
 from exceptionlogger import ExceptionLogger
+import projectloghandler as hlr
+
+
+def logHandler(fname, logfile=False):
+    hlr.logHandler(file=logfile, filename=fname)
 
 
 class ParserService(argparse.ArgumentParser):
-    logger = ExceptionLogger.create_logger(ch, logging.INFO, __name__)
+    def __init__(self, description):
+        self.logger = ExceptionLogger.create_logger(hlr.ch, logging.INFO,
+                                                    __name__)
+        super().__init__(description)
 
     def error(self, message):
         self.logger.error(message)

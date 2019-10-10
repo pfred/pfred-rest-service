@@ -3,14 +3,32 @@
 
 import logging
 import inspect
-from projectloghandler import ch
+import sequenceservice
+import parserservice
+import projectloghandler as hlr
+import utilitiesservice as utils
+import bowtieservice as bowtie
 from exceptionlogger import ExceptionLogger
-from sequenceservice import SeqService
 from parserservice import ParserService
 from multiprocessing import Pool
 
 
-logger = ExceptionLogger.create_logger(ch, logging.INFO, __name__)
+filehandler = False
+
+
+def prepareProjHandler(wfile=False, name='LogFile-pfred'):
+    global logger
+    hlr.logHandler(file=wfile, filename=name)
+    logger = ExceptionLogger.create_logger(hlr.ch, logging.INFO, __name__)
+    sequenceservice.logHandler(logfile=wfile, fname=name)
+    parserservice.logHandler(logfile=wfile, fname=name)
+    utils.logHandler(logfile=wfile, fname=name)
+    bowtie.logHandler(logfile=wfile, fname=name)
+
+
+@ExceptionLogger(None, ZeroDivisionError, hlr.ch, "")
+def divide():
+    return 1 / 1
 
 
 def prepareInput():
@@ -20,7 +38,7 @@ def prepareInput():
 
     parser = ParserService(description='Provide gene \
                            ID and species of interest \
-                           in order to get orthologs')
+    in order to get orthologs')
 
     parser.add_argument(flags[0], type=str, action='store', required=True,
                         dest="id", help='Species ID, could be Ensembl \
@@ -59,13 +77,14 @@ def prepareInput():
 
 # Get Orthologs part
 
+prepareProjHandler(wfile=filehandler)
 finput = prepareInput()
 id = finput[0]
 id = id.strip()
 inputSpecies = finput[1]
 requestedSpeciesl = finput[2]
 outfile = finput[3]
-seq = SeqService()
+seq = sequenceservice.SeqService()
 seq.validSpecies()
 reqspfull = seq.getFullNames(requestedSpeciesl)
 inspfull = seq.getFullNames(inputSpecies)
@@ -77,12 +96,13 @@ seq.checkSpeciesInput(inspfull, id)
 orthogenes = seq.getAllOrthologGenes(id, inspfull, reqspfull)
 seq.getSpeciesObjs(orthogenes)
 transdic = seq.getAllTranscripts(orthogenes)
-translist = seq.flattenDic(transdic)
+translist = utils.flattenDic(transdic)
 seqdic = seq.getSeqs(translist, 'cdna')
 msg = seq.prepareOrthologData()
 
 header = ['name', 'species', 'length', 'source']
-seq.createOutCsv(header, msg, outfile)
+utils.createOutCsv(header, msg, outfile)
+seq.createFastaFile('sequence.fa')
 
 # Enumerate part
 
@@ -97,7 +117,7 @@ header = ['sequenceName', 'columnNumber', 'residueNumber', 'number',
 
 outfile = 'exonBoundaries.csv'
 msg = seq.prepareBoundaryData()
-seq.createOutCsv(header, msg, outfile)
+utils.createOutCsv(header, msg, outfile)
 
 # Variations part
 
@@ -111,12 +131,35 @@ header = ['sequenceName', 'columnNumber', 'residueNumber', 'number',
 outfile = 'variantionData.csv'
 msg = seq.prepareVariationData()
 
+utils.createOutCsv(header, msg, outfile)
 
-seq.createOutCsv(header, msg, outfile)
+# Bowtie part
 
-ch.flush()
+header = ['name', 'start', 'end', 'length', 'parent_dna_oligo',
+          'parent_sense_oligo', 'parent_antisense_oligo', 'target_name']
 
-# db = MySQLdb.connect(host='useastdb.ensembl.org', user='anonymous', port=5306,
-#                      database='ensembl_stable_ids_97')
-# cursor = db.cursor()
+for tran in transcripts:
+    header.append(tran + '_match')
+    header.append(tran + '_position')
 
+sequence = seqdic['ENST00000378474']
+seq.enumerateSeq(sequence, 14)
+enumoligos = [seq.dnaoligos, seq.rnaoligos, seq.rnaasos]
+bow = bowtie.BowtieService('sequence.fa')
+bow.prepareInput('ENST00000378474', enumoligos)
+bow.search()
+bow.parseOutput()
+bow.writeOligoOut(header, 'oligoout.csv', transcripts, enumoligos, 14,
+                  'ENST00000378474')
+bow.cleanUp()
+
+# Join Oligo part
+
+reader = utils.readAnnotationCsv('exonBoundaries.csv')
+seq.assignExons(reader)
+reader = utils.readAnnotationCsv('variantionData.csv')
+seq.assignSNPs(reader)
+reader = utils.readAnnotationCsv('oligoout.csv')
+seq.createOligoOut('outputSummary_.csv', reader)
+
+hlr.ch.flush()

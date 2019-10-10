@@ -3,7 +3,6 @@
 
 import logging
 import traceback
-# from inspect import getframeinfo, stack
 
 
 class ExceptionLogger:
@@ -16,11 +15,16 @@ class ExceptionLogger:
 
     def __call__(self, func):
         def wrapper(*args, **kwargs):
+
             # If argument is a string, it has to provide name of logger attr
 
             if(args and isinstance(self.logr, str)):
                 self.logr = getattr(args[0], self.logr)
                 self.msg = getattr(args[0], self.msg)
+            elif(self.logr is None):
+                self.logr = logging.getLogger(func.__name__)
+                self.logr.setLevel(logging.INFO)
+                self.logr.addHandler(self.ch)
             elif not isinstance(self.logr, logging.Logger):
                 print("No logger attribute given")
                 raise ValueError

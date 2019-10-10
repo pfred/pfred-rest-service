@@ -1,37 +1,52 @@
 #! /usr/bin/env python3
 # Change in container code to /home/pfred/bin/python-3.6.2/bin/env python3
 
+import csv
 import ensembl_rest
 import logging
 import multiprocessing
-from projectloghandler import ch
+import textwrap
+import utilitiesservice as utils
+import projectloghandler as hlr
 from exceptionlogger import ExceptionLogger
-from itertools import chain
+
+
+def logHandler(fname, logfile=False):
+    hlr.logHandler(file=logfile, filename=fname)
 
 
 class SeqService:
     def __init__(self):
-        self.logger = ExceptionLogger.create_logger(ch, logging.INFO, __name__)
+        self.logger = ExceptionLogger.create_logger(hlr.ch,
+                                                    logging.INFO, __name__)
         self._species = {'mouse': 'mus_musculus',
                          'rat': 'rattus_norvegicus',
                          'human': 'homo_sapiens',
                          'dog': 'canis_familiaris',
                          'chimp': 'pan_troglodytes',
                          'macaque': 'macaca_mulatta'}
+        manager = multiprocessing.Manager()
+        self._subs = {'C': 'G', 'G': 'C', 'A': 'U', 'U': 'A', 'T': 'A'}
+        self._subsdna = {'C': 'G', 'G': 'C', 'A': 'T', 'U': 'A', 'T': 'A'}
         self._mapdic = {}
         self._loggermsg = ""
         self.orthogenes = []
         self.allspecies = []
         self.matrixdata = []
+        self.dnaoligos = []
+        self.rnaoligos = []
+        self.rnaasos = []
         self._speciesobjs = {}
+        self._exonposdic = {}
+        self._exonnamedic = {}
+        self._snpdic = {}
         self.transcriptdic = {}
         self.seqsdic = {}
         self.exondic = {}
         self.utrdic = {}
-        manager = multiprocessing.Manager()
         self.varsdic = manager.dict()
 
-    @ExceptionLogger("logger", ensembl_rest.HTTPError, ch, "_loggermsg")
+    @ExceptionLogger("logger", ensembl_rest.HTTPError, hlr.ch, "_loggermsg")
     def setGen2CdnaMap(self, id, regioncdna):
         optional = {'include_original_region': 1}
         regioncdnas = [str(i) for i in regioncdna]
@@ -39,7 +54,7 @@ class SeqService:
         self._mapdic[id] = ensembl_rest.assembly_cdna(id, regioncdnas,
                                                       params=optional)
 
-    @ExceptionLogger("logger", KeyError, ch, "_loggermsg")
+    @ExceptionLogger("logger", KeyError, hlr.ch, "_loggermsg")
     def mapGen2Cdna(self, id, length):
         """
         Maps coordinates from cdna to genomic space
@@ -55,12 +70,6 @@ class SeqService:
             if(genomic['start'] <= length <= genomic['end']):
                 return length - (genomic['end'] - target['end'])
         return None
-
-    def flattenList(self, seqslist):
-        return list((chain.from_iterable(seqslist)))
-
-    def flattenDic(self, seqsdic):
-        return sorted(set(chain(*seqsdic.values())))
 
     def createFullSpeciesl(self, inspecies, reqspecies):
         if isinstance(inspecies, str):
@@ -79,11 +88,11 @@ class SeqService:
         msg = '\n'.join(msg)
         self._loggermsg = msg
 
-    @ExceptionLogger("logger", KeyError, ch, "_loggermsg")
+    @ExceptionLogger("logger", KeyError, hlr.ch, "_loggermsg")
     def getSeqsLength(self, seqs):
         return [abs(seq['end'] - seq['start']) + 1 for seq in seqs]
 
-    @ExceptionLogger("logger", KeyError, ch, "_loggermsg")
+    @ExceptionLogger("logger", KeyError, hlr.ch, "_loggermsg")
     def getSeqObjCumuLength(self, objs, condition, key='object_type'):
         """
         Given a list of objects, compute cumulative length on seq elements
@@ -94,7 +103,7 @@ class SeqService:
                    if (obj[key] == condition)
                    else 0 for obj in objs])
 
-    @ExceptionLogger("logger", KeyError, ch, "_loggermsg")
+    @ExceptionLogger("logger", KeyError, hlr.ch, "_loggermsg")
     def getFullNames(self, species):
         """
         Convert common names into full names
@@ -109,7 +118,7 @@ class SeqService:
             speciesfullnames.append(self._species[sp])
         return speciesfullnames
 
-    @ExceptionLogger("logger", KeyError, ch, "_loggermsg")
+    @ExceptionLogger("logger", KeyError, hlr.ch, "_loggermsg")
     def checkSpeciesInput(self, inspecies, spid):
         """
         Checks whether the input stable id matches the input species
@@ -129,7 +138,63 @@ class SeqService:
         self.logger.exception("Input species and given stable ID dont match")
         raise ValueError
 
-    @ExceptionLogger("logger", ensembl_rest.HTTPError, ch, "_loggermsg")
+    @ExceptionLogger("logger", ValueError, hlr.ch, "_loggermsg")
+    def rna2dna(self, seq):
+        """
+        Convert from RNA to DNA
+        """
+        dna = seq.replace('U', 'T')
+        return dna
+
+    @ExceptionLogger("logger", ValueError, hlr.ch, "_loggermsg")
+    def cdna2rna(self, seq):
+        """
+        Convert from cDNA to RNA
+        """
+        rna = seq.replace('T', 'U')
+        return rna
+
+    @ExceptionLogger("logger", ValueError, hlr.ch, "_loggermsg")
+    def getReverseComplement(self, seq, type):
+        """
+        Gets sequence and returns its reverse complement
+        """
+
+        reverse = ''.join(reversed(seq))
+
+        if type == 'dna':
+            return utils.replaceMultiple(reverse, self._subsdna)
+        else:
+            return utils.replaceMultiple(reverse, self._subs)
+
+    @ExceptionLogger("logger", ValueError, hlr.ch, "_loggermsg")
+    def enumerateSeq(self, seq, oligolen):
+        """
+        Enumerate given sequence
+        """
+
+        cdna2rna = self.cdna2rna
+        getReverseComp = self.getReverseComplement
+
+        dnaoligos = self.dnaoligos
+        rnaoligos = self.rnaoligos
+        rnaasos = self.rnaasos
+
+        dna = self.rna2dna(seq)
+        total = len(dna) - oligolen + 1
+
+        for elem in range(total):
+            endi = elem + oligolen
+            subdna = dna[elem:endi]
+            dnaoligos.append(subdna)
+            rnaoligos.append(cdna2rna(subdna))
+            rnaasos.append(getReverseComp(subdna, 'rna'))
+
+        self.dnaoligos = dnaoligos
+        self.rnaoligos = rnaoligos
+        self.rnaasos = rnaasos
+
+    @ExceptionLogger("logger", ensembl_rest.HTTPError, hlr.ch, "_loggermsg")
     def getSpeciesObjs(self, spids):
         """
         Gets all objects from given species stable IDs
@@ -144,7 +209,7 @@ class SeqService:
         self._speciesobjs = ensembl_rest.lookup_post(params=optional)
         return self._speciesobjs
 
-    @ExceptionLogger("logger", ensembl_rest.HTTPError, ch, "_loggermsg")
+    @ExceptionLogger("logger", ensembl_rest.HTTPError, hlr.ch, "_loggermsg")
     def getAllOrthologGenes(self, ingene, inspec, reqspec):
         """
         Gets all orthologous genes for the input gene
@@ -184,7 +249,7 @@ class SeqService:
 
         return self.orthogenes
 
-    @ExceptionLogger("logger", KeyError, ch, "_loggermsg")
+    @ExceptionLogger("logger", KeyError, hlr.ch, "_loggermsg")
     def getAllTranscripts(self, spids, species=None):
         """
         Gets all transcripts given the stable ids
@@ -207,7 +272,7 @@ class SeqService:
 
         return self.transcriptdic
 
-    @ExceptionLogger("logger", ensembl_rest.HTTPError, ch, "_loggermsg")
+    @ExceptionLogger("logger", ensembl_rest.HTTPError, hlr.ch, "_loggermsg")
     def getSeqs(self, spids, seqtype=None):
         """
         Gets FASTA sequences given stable ids
@@ -228,7 +293,7 @@ class SeqService:
 
         return self.seqsdic
 
-    @ExceptionLogger("logger", KeyError, ch, "_loggermsg")
+    @ExceptionLogger("logger", KeyError, hlr.ch, "_loggermsg")
     def getExons(self, spids, species=None):
         """
         Gets exon objects given stable ID
@@ -287,21 +352,24 @@ class SeqService:
                                               var['consequence_type'] !=
                                               filtvalue, vars))
         else:
-
             self.varsdic = {}
 
             if isinstance(spids, str):
                 spids = [spids]
 
-            for spid in spids:
-                self.varsdic[spid] = ensembl_rest.overlap_id(spid,
-                                                             params=optional)
-                vars = self.varsdic[spid]
-                self.varsdic[spid] = list(filter(lambda var:
-                                                 var['consequence_type'] !=
-                                                 filtvalue, vars))
+            try:
+                for spid in spids:
+                    self.varsdic[spid] = ensembl_rest.overlap_id(spid,
+                                                                 params=optional)
+                    vars = self.varsdic[spid]
+                    self.varsdic[spid] = list(filter(lambda var:
+                                                     var['consequence_type'] !=
+                                                     filtvalue, vars))
+                    self.logger.info(spids)
+            except ensembl_rest.HTTPError as e:
+                self.logger.exception(str(e))
 
-    @ExceptionLogger("logger", KeyError, ch, "_loggermsg")
+    @ExceptionLogger("logger", KeyError, hlr.ch, "_loggermsg")
     def getUTRs(self, spids, species=None):
         """
         Gets UTR objects given stable ID
@@ -325,6 +393,176 @@ class SeqService:
                     self.utrdic[id] = trans['UTR']
 
         return self.utrdic
+
+    @ExceptionLogger("logger", ValueError, hlr.ch, "_loggermsg")
+    def assignExons(self, junctions):
+        """
+        Takes retrieved exonboundaries file and creates dictionaries
+        of exon positions and names
+        """
+
+        exonpos = self._exonposdic
+        exonname = self._exonnamedic
+        pos = []
+        ename = []
+
+        # Skip header in file
+
+        next(junctions)
+
+        for count, row in enumerate(junctions):
+            target = row[0]
+            residue = row[2]
+            isutr = row[9]
+            name = 'exon' + str(count)
+
+            if (isutr == 'true'):
+                name = '5UTR'
+
+            pos.append(residue)
+            ename.append(name)
+            exonpos[target] = pos
+            exonname[target] = ename
+
+            if len(pos) > 1:
+                pos = []
+                ename = []
+
+        self._exonposdic = exonpos
+        self._exonnamedic = exonname
+
+    @ExceptionLogger("logger", ValueError, hlr.ch, "_loggermsg")
+    def assignSNPs(self, variations):
+        """
+        Takes retrieved variations file and creates SNP
+        dictionary
+        """
+
+        snpdic = self._snpdic
+
+        # Skip header in file
+
+        next(variations)
+
+        for row in variations:
+            target = row[0]
+            residue = row[2]
+            snpid = row[9]
+            allele = row[10]
+            if not(target in snpdic.keys()):
+                snpdic[target] = {}
+            snpdic[target][residue] = snpid + '({} {})'.format(residue,
+                                                               allele)
+        self._snpdic = snpdic
+
+    @ExceptionLogger("logger", IndexError, hlr.ch, "_loggermsg")
+    def extractTransfromCsvHeader(self, header, filtch):
+        """
+        Gets the transcript names given the header from oligout file
+        """
+
+        indexes = [sub.find(filtch) for sub in header]
+        trans = [sub[:i] for sub, i in zip(header, indexes)]
+        return trans
+
+    @ExceptionLogger("logger", ValueError, hlr.ch, "_loggermsg")
+    def createOligoOut(self, fname, oligout):
+        """
+        Merges variation, exon and oligo data together into final out file
+        """
+
+        all = []
+        snpdic = self._snpdic
+        exonnamedic = self._exonnamedic
+        exonposdic = self._exonposdic
+
+        # Get original header in file
+
+        row = next(oligout)
+
+        # Just take the transcript names from header
+
+        starttrans = 8  # Index in header where transcripts start (Hardcoded)
+
+        transcripts = row[starttrans:]
+        transcripts = self.extractTransfromCsvHeader(transcripts, '_')
+        transcripts = utils.noDuplicates(transcripts)
+
+        starttrans -= 1
+
+        # Modify file header
+
+        row.append('transcriptLocation')
+
+        for tran in transcripts:
+            row.append(tran + '_snp')
+
+        for count, row in enumerate(oligout):
+            target = row[7]
+            start = int(row[1])
+            oligolen = int(row[3])
+            added = False
+            for index, name in enumerate(exonnamedic[target]):
+                pos = exonposdic[target]
+                pos = int(pos[index])
+                if pos >= start:
+                    row.append(name)
+                    added = True
+                    break
+            if not(added):
+                row.append('3UTR')
+
+            # Add the snpids if they're within the interval
+
+            for index, tran in enumerate(transcripts, start=1):
+                index = starttrans + 2 * index  # Map to header index
+                transtart = row[index]
+                snips = []
+                if transtart != 'NA':
+                    transtart = transtart.split(' ')
+                    transtart = [int(st) for st in transtart]
+                    if tran in snpdic.keys():
+                        for pos in snpdic[tran]:
+                            if pos in snpdic[target].keys():
+                                for tstart in transtart:
+                                    transend = tstart + oligolen
+                                    posint = int(pos)
+                                    if tstart <= posint < transend:
+                                        snips.append(snpdic[target][pos])
+                row.append(' '.join(snips))
+            all.append(row)
+
+        # Write final set of rows to file
+
+        with open(fname, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile, delimiter=',',
+                                quotechar='', quoting=csv.QUOTE_NONE)
+            writer.writerows(all)
+
+    def createFastaFile(self, fname):
+        """
+        Outputs sequence dictionary into FASTA format
+        """
+
+        msg = []
+        seqdic = self.seqsdic
+        transcriptdic = self.transcriptdic
+        maxcols = 60  # hardcoded
+
+        for spec in self.allspecies:
+            for tid in transcriptdic[spec]:
+                msg.append('>{}'.format(tid))
+
+                # Limit lines to maxcols
+
+                string = textwrap.wrap(seqdic[tid], maxcols)
+                for sub in string:
+                    msg.append('{}'.format(sub))
+
+        msg = '\n'.join(msg)
+        outhandler = open(fname, 'w')
+        outhandler.write(msg)
+        outhandler.close()
 
     def prepareOrthologData(self):
         """
@@ -361,10 +599,12 @@ class SeqService:
                 fivedis = self.getSeqObjCumuLength(utrs, 'five_prime_UTR')
                 threedis = self.getSeqObjCumuLength(utrs, 'three_prime_UTR')
                 exondis = len(self.seqsdic[tran]) - threedis
-                fiveutrexists = str(fivedis > 0).lower()
-                exonsexist = str(exondis > 0).lower()
+                fiveutrexists = fivedis > 0
                 nfiveutrexists = str(not(fiveutrexists)).lower()
+                fiveutrexists = str(fiveutrexists).lower()
+                exonsexist = exondis > 0
                 nexonexists = str(not(exonsexist)).lower()
+                exonsexist = str(exonsexist).lower()
                 matrixdata.append([tran,  # Transcript ID
                                    '-1',  # -1
                                    fivedis,  # 5primes length
@@ -392,7 +632,7 @@ class SeqService:
 
     def prepareVariationData(self):
         """
-        Flattens boundary data structures into a matrix
+        Flattens variation data structures into a matrix
         for csv format
         """
 
@@ -426,20 +666,3 @@ class SeqService:
                                                var['consequence_type'].upper()])
         self.matrixdata = matrixdata
         return self.matrixdata
-
-    @ExceptionLogger("logger", ValueError, ch, "_loggermsg")
-    def createOutCsv(self, title, data, fname):
-        """
-        Creates output file given filename, data and title in csv format
-        input data must be list of lists
-        """
-
-        msg = [",".join(title)]
-
-        for row in data:
-            msg.append(",".join(map(str, row)))
-
-        msg = '\n'.join(msg)
-        outhandler = open(fname, 'w')
-        outhandler.write(msg)
-        outhandler.close()

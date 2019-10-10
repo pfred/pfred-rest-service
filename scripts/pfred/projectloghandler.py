@@ -1,4 +1,15 @@
+import os
 import logging
 
-ch = logging.StreamHandler()
-fh = logging.FileHandler("LogFile-pfred")
+
+def logHandler(file=False, filename='LogFile-pfred'):
+    global ch
+    if file:
+        if os.path.exists(filename):
+            os.remove(filename)
+        ch = logging.FileHandler(filename)
+    else:
+        ch = logging.StreamHandler()
+
+
+logHandler()
