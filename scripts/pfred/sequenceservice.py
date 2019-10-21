@@ -1,5 +1,4 @@
 #! /usr/bin/env python3
-# Change in container code to /home/pfred/bin/python-3.6.2/bin/env python3
 
 import csv
 import mmap
