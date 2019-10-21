@@ -255,21 +255,6 @@ class SeqService:
         return self._speciesobjs
 
     @ExceptionLogger("logger", ensembl_rest.HTTPError, hlr.ch, "_loggermsg")
-    def getTranscriptDic(self, spids):
-        """
-        Cretes transcripts dic
-        """
-
-        # Get All info from species
-
-        if isinstance(spids, str):
-            spids = [spids]
-
-        # optional = {'ids': spids, 'expand': 1, 'utr': 1}
-        # self._speciesobjs = ensembl_rest.lookup_post(params=optional)
-        # return self._speciesobjs
-
-    @ExceptionLogger("logger", ensembl_rest.HTTPError, hlr.ch, "_loggermsg")
     def getAllOrthologGenes(self, ingene, inspec, reqspec):
         """
         Gets all orthologous genes for the input gene
