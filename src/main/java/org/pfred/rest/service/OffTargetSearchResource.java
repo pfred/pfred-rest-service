@@ -15,32 +15,30 @@ import io.swagger.annotations.ApiResponses;
 import javax.ws.rs.QueryParam;
 import org.pfred.rest.service.ShellUtilities;
 
-@Path("ActivityModel")
-@Api(value = "Activity Model")
-public class ActivityModelResource {
+@Path("OffTargetSearch")
+@Api(value = "Off Target Search")
+public class OffTargetSearchResource {
 
-    private static Logger logger = Logger.getLogger(ActivityModelResource.class.getName());
+    private static Logger logger = Logger.getLogger(OffTargetSearchResource.class.getName());
 
     @GET
     @Produces(value = MediaType.TEXT_PLAIN)
     @Path(value = "siRNA")
     @ApiResponses(value = {
-        @ApiResponse(code = 200, message = "Run siRNA activity model successfully"),
-        @ApiResponse(code = 400, message = "Error occurred in running siRNA activity model")})
-    @ApiOperation(value = "Run siRNA Activity Model")
-    public Response runSirnaActivityModel(@ApiParam(value = "Primary Sequence", required = true) @QueryParam("PrimarySequence") final String primarySequence,
-            @ApiParam(value = "Run Directory", required = true) @QueryParam("RunDirectory") final String runName) {
-        String shellScript = "siRNAActivityModel.sh";
-        String outputFile = "siRNAActivityModelResult.csv";
+        @ApiResponse(code = 200, message = "Run siRNA off target search successfully"),
+        @ApiResponse(code = 400, message = "Error occurred in running siRNA off target search")})
+    @ApiOperation(value = "Run siRNA Off Target Search")
+    public Response runSirnaOffTargetSearch(@ApiParam(value = "species", required = true) @QueryParam("Species") final String species,
+            @ApiParam(value = "Run Directory", required = true) @QueryParam("RunDirectory") final String runName,
+            @ApiParam(value = "IDs", required = true) @QueryParam("IDs") final String IDs,
+            @ApiParam(value = "missMatches", required = true) @QueryParam("missMatches") final String missMatches) {
+        String shellScript = "siRNAOffTargetSearch.sh";
+        String outputFile = "siRNAOffTargetSearchResult.csv";
         String targetFile = "target.txt";
 
-        String scriptsDirectory = ShellUtilities.getScriptsDir();
         String fullRunDirectory = ShellUtilities.prepareRunDir(runName);
+        String command = shellScript + " " + species + " " + IDs + " " + missMatches;
 
-        ShellUtilities.saveStringAsFile(fullRunDirectory + "/" + targetFile, primarySequence);
-        ShellUtilities.copyFile(scriptsDirectory + "/siRNA_2431seq_modelBuilding.csv", fullRunDirectory);
-
-        String command = shellScript;
         boolean success = ShellUtilities.runCommandThroughShell(command, fullRunDirectory);
 
         if (success) {
@@ -59,26 +57,18 @@ public class ActivityModelResource {
     @Produces(value = MediaType.TEXT_PLAIN)
     @Path(value = "ASO")
     @ApiResponses(value = {
-        @ApiResponse(code = 200, message = "Run ASO activity model successfully"),
-        @ApiResponse(code = 400, message = "Error occurred in running ASO activity model")})
-    @ApiOperation(value = "Run ASO Activity Model")
-    public Response runAsoActivityModel(@ApiParam(value = "Primary Sequence", required = true) @QueryParam("PrimarySequence") final String primarySequence,
+        @ApiResponse(code = 200, message = "Run ASO off target search successfully"),
+        @ApiResponse(code = 400, message = "Error occurred in running ASO off target search")})
+    @ApiOperation(value = "Run ASO Off Target Search")
+    public Response runAsoOffTargetSearch(@ApiParam(value = "species", required = true) @QueryParam("Species") final String species,
             @ApiParam(value = "Run Directory", required = true) @QueryParam("RunDirectory") final String runName,
-            @ApiParam(value = "Oligonucleotide Length", required = true) @QueryParam("OligoLength") final Integer oligoLength) {
-        //TODO: OligoLength is not being used in this function
-        String shellScript = "ASOActivityModel.sh";
-        String outputFile = "ASOActivityModelResult.csv";
-        String targetFile = "target.txt";
+            @ApiParam(value = "IDs", required = true) @QueryParam("IDs") final String IDs,
+            @ApiParam(value = "missMatches", required = true) @QueryParam("missMatches") final String missMatches) {
+        String shellScript = "ASOOffTargetSearch.sh";
+        String outputFile = "ASOOffTargetSearchResult.csv";
 
-        String scriptsDirectory = ShellUtilities.getScriptsDir();
         String fullRunDirectory = ShellUtilities.prepareRunDir(runName);
-
-        ShellUtilities.saveStringAsFile(fullRunDirectory + "/"+targetFile, primarySequence);
-
-        ShellUtilities.copyFile(scriptsDirectory + "/input_15_21_100_1000_12.txt", fullRunDirectory);
-        ShellUtilities.copyFile(scriptsDirectory + "/AOBase_542seq_cleaned_modelBuilding_Jan2009_15_21_noOutliers.csv", fullRunDirectory);
-
-        String command = shellScript;
+        String command = shellScript + " " + species + " " + IDs + " " + missMatches;
 
         boolean success = ShellUtilities.runCommandThroughShell(command, fullRunDirectory);
 
