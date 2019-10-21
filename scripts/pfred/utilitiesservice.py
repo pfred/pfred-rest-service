@@ -107,7 +107,9 @@ def createOutCsv(title, data, fname):
 
 @ExceptionLogger(None, ValueError, hlr.ch, "")
 def readAnnotationCsv(fname):
-    return csv.reader(open(fname), delimiter=',')
+    file = open(fname)
+    reader = csv.reader(file, delimiter=',')
+    return [file, reader]
 
 
 def flattenList(seqslist):

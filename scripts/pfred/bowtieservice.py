@@ -22,6 +22,7 @@ class BowtieService:
         self._build = 'BOWTIE_BUILD'
         self._basename = 'onTarget' + str(utils.pid())
         self._infilename = '.dnaOligo.fa'
+        self.file = ''
         self.reader = ''
         self.mismatch = 2
         self.outfilename = ""
@@ -130,7 +131,8 @@ class BowtieService:
         if outf is None:
             outf = self._outfilename
 
-        self.reader = csv.reader(open(outf), delimiter='\t')
+        self.file = open(outf)
+        self.reader = csv.reader(self.file, delimiter='\t')
         return self.reader
 
     def resetMatchDis(self, transcripts, transdic, target):
@@ -237,4 +239,5 @@ class BowtieService:
         Remove all ebwt files form working directory
         """
 
+        self.file.close()
         utils.rm('*.ebwt')

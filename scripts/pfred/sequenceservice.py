@@ -2,6 +2,7 @@
 # Change in container code to /home/pfred/bin/python-3.6.2/bin/env python3
 
 import csv
+import mmap
 import ensembl_rest
 import logging
 import multiprocessing
@@ -194,6 +195,51 @@ class SeqService:
         self.rnaoligos = rnaoligos
         self.rnaasos = rnaasos
 
+    @ExceptionLogger("logger", ValueError, hlr.ch, "_loggermsg")
+    def getSeqsfromFasta(self, fasta, ids):
+        """
+        Get sequences from FASTA file and store in dictionary
+        """
+        if not(isinstance(ids, list)):
+            ids = [ids]
+
+        with open(fasta, 'rb', 0) as file, \
+                mmap.mmap(file.fileno(), 0, access=mmap.ACCESS_READ) as s:
+
+            for gid in ids:
+                if s.find(bytes(gid, 'utf-8')) != -1:
+                    file.seek(0)
+                    copy = False
+                    sequence = []
+                    for line in file:
+                        line = line.decode('utf-8')
+                        line = line.strip()
+                        code = '>' + gid
+                        if line == code:
+                            copy = True
+                            continue
+                        elif line[0] == '>':
+                            copy = False
+                            continue
+                        elif copy:
+                            sequence.append(line)
+                    self.seqsdic[gid] = ''.join(sequence)
+            return self.seqsdic
+
+    @ExceptionLogger("logger", ValueError, hlr.ch, "_loggermsg")
+    def getIDsfromFasta(self, fasta):
+        """
+        Get ENSEMBL IDs from FASTA file and store in dictionary
+        """
+
+        trans = []
+
+        for line in open(fasta):
+            if line.startswith('>'):
+                tran = line.strip()
+                trans.append(tran[1:])
+        return trans
+
     @ExceptionLogger("logger", ensembl_rest.HTTPError, hlr.ch, "_loggermsg")
     def getSpeciesObjs(self, spids):
         """
@@ -208,6 +254,21 @@ class SeqService:
         optional = {'ids': spids, 'expand': 1, 'utr': 1}
         self._speciesobjs = ensembl_rest.lookup_post(params=optional)
         return self._speciesobjs
+
+    @ExceptionLogger("logger", ensembl_rest.HTTPError, hlr.ch, "_loggermsg")
+    def getTranscriptDic(self, spids):
+        """
+        Cretes transcripts dic
+        """
+
+        # Get All info from species
+
+        if isinstance(spids, str):
+            spids = [spids]
+
+        # optional = {'ids': spids, 'expand': 1, 'utr': 1}
+        # self._speciesobjs = ensembl_rest.lookup_post(params=optional)
+        # return self._speciesobjs
 
     @ExceptionLogger("logger", ensembl_rest.HTTPError, hlr.ch, "_loggermsg")
     def getAllOrthologGenes(self, ingene, inspec, reqspec):
@@ -263,6 +324,7 @@ class SeqService:
 
         for id in spids:
             tidl = []
+            # print(species)
             specy = species[id]
             transcripts = specy['Transcript']
             for trans in transcripts:
@@ -583,7 +645,7 @@ class SeqService:
 
         return self.matrixdata
 
-    def prepareBoundaryData(self):
+    def prepareBoundaryData(self, trans):
         """
         Flattens boundary data structures into a matrix
         for csv format
@@ -593,44 +655,43 @@ class SeqService:
 
         # Optimize this...
 
-        for name, trans in self.transcriptdic.items():
-            for tran in trans:
-                utrs = self.utrdic[tran]
-                fivedis = self.getSeqObjCumuLength(utrs, 'five_prime_UTR')
-                threedis = self.getSeqObjCumuLength(utrs, 'three_prime_UTR')
-                exondis = len(self.seqsdic[tran]) - threedis
-                fiveutrexists = fivedis > 0
-                nfiveutrexists = str(not(fiveutrexists)).lower()
-                fiveutrexists = str(fiveutrexists).lower()
-                exonsexist = exondis > 0
-                nexonexists = str(not(exonsexist)).lower()
-                exonsexist = str(exonsexist).lower()
-                matrixdata.append([tran,  # Transcript ID
-                                   '-1',  # -1
-                                   fivedis,  # 5primes length
-                                   '-1',
-                                   '0.21',
-                                   '0.7',
-                                   '0.59',
-                                   '*',
-                                   'untitled',
-                                   fiveutrexists, nfiveutrexists])
+        for tran in trans:
+            utrs = self.utrdic[tran]
+            fivedis = self.getSeqObjCumuLength(utrs, 'five_prime_UTR')
+            threedis = self.getSeqObjCumuLength(utrs, 'three_prime_UTR')
+            exondis = len(self.seqsdic[tran]) - threedis
+            fiveutrexists = fivedis > 0
+            nfiveutrexists = str(not(fiveutrexists)).lower()
+            fiveutrexists = str(fiveutrexists).lower()
+            exonsexist = exondis > 0
+            nexonexists = str(not(exonsexist)).lower()
+            exonsexist = str(exonsexist).lower()
+            matrixdata.append([tran,  # Transcript ID
+                                '-1',  # -1
+                                fivedis,  # 5primes length
+                                '-1',
+                                '0.21',
+                                '0.7',
+                                '0.59',
+                                '*',
+                                'untitled',
+                                fiveutrexists, nfiveutrexists])
 
-                matrixdata.append([tran,  # Transcript ID
-                                   '-1',  # -1
-                                   exondis,  # exons length
-                                   '-1',
-                                   '0.21',
-                                   '0.7',
-                                   '0.59',
-                                   '*',
-                                   'untitled',
-                                   nexonexists, exonsexist])
+            matrixdata.append([tran,  # Transcript ID
+                                '-1',  # -1
+                                exondis,  # exons length
+                                '-1',
+                                '0.21',
+                                '0.7',
+                                '0.59',
+                                '*',
+                                'untitled',
+                                nexonexists, exonsexist])
 
         self.matrixdata = matrixdata
         return self.matrixdata
 
-    def prepareVariationData(self):
+    def prepareVariationData(self, trans):
         """
         Flattens variation data structures into a matrix
         for csv format
@@ -643,26 +704,25 @@ class SeqService:
 
         # Optimize this...
 
-        for name, trans in self.transcriptdic.items():
-            for tran in trans:
-                vars = varsdic[tran]
-                if vars:
-                    length = len(self.seqsdic[tran])
-                    genMapper(tran, [1, length])
-                    for var in vars:
-                        coord = mapper(tran, var['start'])
-                        if coord:
-                            matrixdata.append([tran,
-                                               '-1',
-                                               coord,
-                                               '-1',
-                                               '0.21',
-                                               '0.49',
-                                               '0.84',
-                                               '*',
-                                               'untitled',
-                                               var['id'],
-                                               '/'.join(var['alleles']),
-                                               var['consequence_type'].upper()])
+        for tran in trans:
+            vars = varsdic[tran]
+            if vars:
+                length = len(self.seqsdic[tran])
+                genMapper(tran, [1, length])
+                for var in vars:
+                    coord = mapper(tran, var['start'])
+                    if coord:
+                        matrixdata.append([tran,
+                                            '-1',
+                                            coord,
+                                            '-1',
+                                            '0.21',
+                                            '0.49',
+                                            '0.84',
+                                            '*',
+                                            'untitled',
+                                            var['id'],
+                                            '/'.join(var['alleles']),
+                                            var['consequence_type'].upper()])
         self.matrixdata = matrixdata
         return self.matrixdata
