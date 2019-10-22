@@ -542,6 +542,7 @@ class SeqService:
 
         for tran in transcripts:
             row.append(tran + '_snp')
+        all.append(row)
 
         for count, row in enumerate(oligout):
             target = row[7]
