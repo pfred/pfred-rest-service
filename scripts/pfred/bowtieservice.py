@@ -28,7 +28,8 @@ class BowtieService:
         self.inputvars = []
         self.checkBowtie()
         self.getBowtieEnvs()
-        self.buildIndex(fastafiles)
+        if fastafiles:
+            self.buildIndex(fastafiles)
 
     def checkBowtie(self):
         """
@@ -61,6 +62,76 @@ class BowtieService:
         self._bowtie = vars[0]
         self._indexes = vars[1]
         self._build = vars[2]
+
+    @ExceptionLogger('logger', KeyError, hlr.ch, '_loggermsg')
+    def buildBowtieIndexesfromEnsemblGenomicSeq(self, typeseq, species,
+                                                nthreads=1, indexdir=None,
+                                                tmpdir='/tmp/', download=True,
+                                                fun='', ntries=2):
+        """
+        Get type genomic sequences directly from the ENSEMBL ftp site and
+        use bowtie to create all the indexes from this sequences
+        """
+
+        if download:
+            ftpsite = 'ftp://ftp.ensembl.org/pub/release-98/fasta/'
+
+            typeseqdic = {'cdna': 'all',
+                          'dna': 'toplevel'}
+
+            specdbdic = {'Mus_musculus': 'GRCm38',
+                         'Rattus_norvegicus': 'Rnor_6.0',
+                         'Homo_sapiens': 'GRCh38',
+                         'Canis_familiaris': 'CanFam3.1',
+                         'Pan_troglodytes': 'Pan_tro_3.0',
+                         'Macaca_mulatta': 'Mmul_10'}
+
+            if indexdir is None:
+                indexdir = self._indexes
+
+            # Set everything in the right format (e.g Homo_sapiens, cdna)
+
+            if not(isinstance(species, list)):
+                species = [species]
+            if not(isinstance(typeseq, list)):
+                species = [typeseq]
+
+            Species = [sp.capitalize() for sp in species]
+            typeseq = [ty.lower() for ty in typeseq]
+
+            files = [('.').join([sp, specdbdic[sp],
+                                 tseq,
+                                 typeseqdic[tseq], 'fa', 'gz'])
+                     for sp in Species for tseq in typeseq]
+            self.logger.info(files)
+
+            # Prepare urls to download and local file directories,
+            # if decompressing function is given, add it
+
+            urls = [(tmpdir + files[i + 2 * j],
+                     ftpsite + ('/').join([sp, tseq]) + '/' + files[i + 2 * j],
+                     fun, ntries)
+                    for i, tseq in enumerate(typeseq)
+                    for j, sp in enumerate(species)]
+
+            # Get seq files from ENSEMBL ftp site and decompress
+
+            self.logger.info('Attempting to download files...')
+
+            for count, sp in enumerate(species):
+                index = count * nthreads
+                suburls = urls[index: index + nthreads]
+                self.logger.info(suburls)
+                utils.callParallelFetchUrl(suburls, nthreads)
+
+        # Move to index directory TODO: Fill this in and uncomment below
+
+        # Build Bowtie Indexes
+
+        # self.logger.info('Attempting to Build indexes...')
+
+        # for file in files:
+        #     self.buildIndex(file)
 
     def buildIndex(self, fastafiles):
         """

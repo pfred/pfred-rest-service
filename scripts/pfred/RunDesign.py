@@ -212,11 +212,48 @@ def joinOligoOut(parser):
     file.close()
 
 
+def createBowtieIndexes(parser):
+
+    flags = ['-s', '-n', '-t', '-d', '-c', '-r']
+    desta = ['species', 'nthreads', 'seqtypes',
+             'download', 'decompress', 'ntries']
+    helpa = ['Species regular names', 'number of parallel threads',
+             'sequence types', 'should I download the sequence files',
+             'Which tool to decompress', 'How many retries in case url \
+             stops sending data']
+
+    finput = prepareInput(parser, flags, desta, helpa)
+    requestedSpeciesl = finput[0]
+    requestedSpeciesl = parser.listFromInput(requestedSpeciesl,
+                                             '', ',')
+    nthreads = int(finput[1])
+    seqtype = finput[2]
+    seqtype = parser.listFromInput(seqtype, '', ',')
+    download = finput[3]
+    dfun = finput[4]
+    ntries = finput[5]
+
+    # Create data
+
+    seq = sequenceservice.SeqService()
+    seq.validSpecies()
+    reqspfull = seq.getFullNames(requestedSpeciesl)
+    logger.info(reqspfull)
+    bow = bowtie.BowtieService('')
+    bow.buildBowtieIndexesfromEnsemblGenomicSeq(seqtype,
+                                                reqspfull, nthreads,
+                                                tmpdir='/home/dcruz1/Dario/',
+                                                download=download,
+                                                fun=dfun,
+                                                ntries=ntries)
+
+
 def main():
     FUNCTION_MAP = {'getOrthologs': getOrthologs,
                     'getSeqTranscripts': getSeqTranscripts,
                     'callBowtieEnumerate': callBowtieEnumerate,
-                    'joinOligoOut': joinOligoOut}
+                    'joinOligoOut': joinOligoOut,
+                    'createBowtieIndexes': createBowtieIndexes}
 
     prepareProjHandler(wfile=filehandler)
 
