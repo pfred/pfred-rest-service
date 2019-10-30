@@ -214,13 +214,13 @@ def joinOligoOut(parser):
 
 def createBowtieIndexes(parser):
 
-    flags = ['-s', '-n', '-t', '-d', '-c', '-r']
+    flags = ['-s', '-n', '-t', '-d', '-c', '-r', '-f']
     desta = ['species', 'nthreads', 'seqtypes',
-             'download', 'decompress', 'ntries']
+             'download', 'decompress', 'ntries', 'tempdir']
     helpa = ['Species regular names', 'number of parallel threads',
              'sequence types', 'should I download the sequence files',
              'Which tool to decompress', 'How many retries in case url \
-             stops sending data']
+             stops sending data', 'temp directory to store downloads']
 
     finput = prepareInput(parser, flags, desta, helpa)
     requestedSpeciesl = finput[0]
@@ -232,6 +232,7 @@ def createBowtieIndexes(parser):
     download = finput[3]
     dfun = finput[4]
     ntries = finput[5]
+    tmpdir = finput[6]
 
     # Create data
 
@@ -242,7 +243,7 @@ def createBowtieIndexes(parser):
     bow = bowtie.BowtieService('')
     bow.buildBowtieIndexesfromEnsemblGenomicSeq(seqtype,
                                                 reqspfull, nthreads,
-                                                tmpdir='/home/dcruz1/Dario/',
+                                                tmpdir=tmpdir,
                                                 download=download,
                                                 fun=dfun,
                                                 ntries=ntries)
