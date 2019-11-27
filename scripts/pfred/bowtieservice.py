@@ -1,9 +1,19 @@
 #! /usr/bin/env python3
 
+import re
+import time
+import requests
 import logging
+import textwrap
+# import glob
+import subprocess
 import csv
+import multiprocessing
+import simplejson.errors
 import utilitiesservice as utils
 import projectloghandler as hlr
+from itertools import islice
+from multiprocessing import Pool
 from exceptionlogger import ExceptionLogger
 
 
@@ -21,6 +31,8 @@ class BowtieService:
         self._build = 'BOWTIE_BUILD'
         self._basename = 'onTarget' + str(utils.pid())
         self._infilename = '.dnaOligo.fa'
+        self._multprocsinfile = False
+        self.tmpdir = '/tmp/'
         self.file = ''
         self.reader = ''
         self.mismatch = 2
@@ -63,53 +75,265 @@ class BowtieService:
         self._indexes = vars[1]
         self._build = vars[2]
 
+    def createIndexes(self, fileset):
+        """
+        Wrapper that calls the Index building function
+        given a dictionary in the form filename, fasta
+        """
+        filename, fasta = fileset
+        self.buildIndex(fasta, filename)
+
+    def getSeqs(self, spids, ntries):
+        """
+        This method was written adHoc based on the behavior
+        of multiple requests in the ENSEMBL REST API. It
+        is highly recommended to download and Install a local
+        copy of the REST API due to the high intermittency in
+        its website. Server is hardcoded to ensembl rest website
+        """
+        seqsdic = {}
+        if isinstance(spids, str):
+            spids = [spids]
+
+        server = "https://rest.ensembl.org"
+
+        # This is for local ensembl RESTful VM
+
+        # server = "http://127.0.0.1:3000"
+        ext = "/sequence/id"
+        headers = {"Content-Type": "application/json",
+                   "Accept": "application/json",
+                   "Cache-Control": "no-cache",
+                   "Pragma": "no-cache"}
+
+        sids = ['"' + x + '"' for x in spids]
+        sids = (', ').join(sids)
+        sids = '[{}]'.format(sids)
+        sids = '{ "ids" : ' + sids + ' }'
+        r = requests.post(server+ext, headers=headers,
+                          data=sids)
+
+        if r.status_code == 503:
+            if ntries > 0:
+                self.logger.info('Server refused with code 503 for transcripts {}, retrying {}...'.format(spids[0], ntries))
+                time.sleep(3)
+                self.getSeqs(spids, ntries - 1)
+            else:
+                self.logger.error('Failed to retrieve info from server, exiting')
+                r.raise_for_status
+        elif not r.ok:
+            r.raise_for_status
+            raise ValueError
+        else:
+            try:
+                decoded = r.json()
+                if not decoded:
+                    if ntries > 0:
+                        self.logger.info('Empty file was returned for transcripts {}, retrying {}...'.format(spids[0], ntries))
+                        time.sleep(3)
+                        self.getSeqs(spids, ntries - 1)
+                else:
+                    for idx, info in enumerate(decoded):
+                        seqsdic[info['id']] = info['seq']
+                        if not info:
+                            self.logger.info('There is an empty file for transcripts {}, retrying {}...'.format(spids[idx], ntries))
+                            if ntries > 0:
+                                time.sleep(3)
+                                self.getSeqs(spids, ntries - 1)
+                    return seqsdic
+            except simplejson.errors.JSONDecodeError as e:
+                if ntries > 0:
+                    self.logger.info('There was an error writing back from server for transcripts {}, retrying {}...'.format(spids[0], ntries))
+                    time.sleep(3)
+                    self.getSeqs(spids, ntries - 1)
+                else:
+                    self.logger.exception(str(e))
+                    raise e
+
+    def writeSeqs(self, trans):
+        """
+        Gets Sequences from ENSEMBL and streams them into a FASTA file
+        """
+        regularnamedic = {'ENSMUST': 'Mouse',
+                          'ENSRNOT': 'Rat',
+                          'ENST': 'Human',
+                          'ENSCAFT': 'Dog',
+                          'ENSPTRT': 'Chimp',
+                          'ENSMMUT': 'Macaca'}
+
+        maxcols = 60  # hardcoded
+        maxpostcalls = 50
+        tmpdir = self.tmpdir
+
+        try:
+            fname = re.split('(\d+)', trans[0])
+            fname = fname[0]
+            fname = 'all' + regularnamedic[fname] + 'UnsplicedGene.v55.fa'
+            if self._multprocsinfile:
+                fname = fname + str(multiprocessing.current_process().pid)
+            seqsfun = self.getSeqs
+            tot = len(trans)
+            outf = open(tmpdir + fname, 'w')
+            trans = [tran.split('.')[0] for tran in trans]
+            self.logger.info('Attempting to write file {}...'.format(fname))
+
+            for idx in range(0, tot, maxpostcalls):
+                seqdic = {}
+                ntries = 10
+                endx = idx + maxpostcalls
+                while ntries > 0 and not seqdic:
+                    seqdic = seqsfun(trans[idx:endx], ntries)
+                    if not seqdic:
+                        self.logger.info('Empty dictionary for {}, retrying {}...'.format(trans[idx], ntries))
+                        ntries = ntries - 1
+                for tid in trans[idx:endx]:
+                    outf.write('>' + tid + '\n')
+                    string = textwrap.wrap(seqdic[tid], maxcols)
+                    for sub in string:
+                        outf.write(sub)
+                    outf.write('\n')
+
+            self.logger.info('File {} written!'.format(fname))
+            outf.close()
+        except ValueError as e:
+            self.logger.exception(str(e))
+
+    @ExceptionLogger('logger', ValueError, hlr.ch, '_loggermsg')
+    def createUnsplicedIndexesfromCDNAFasta(self, fasta, nthreads, idsfun,
+                                            unspliced=True, mworkers=False):
+        """
+        Extracts each transcript from given fasta file and queries ENSEMBL
+        for sequences in order to build indexes
+        """
+        regularnamedic = {'Mus_musculus': 'Mouse',
+                          'Rattus_norvegicus': 'Rat',
+                          'Homo_sapiens': 'Human',
+                          'Canis_familiaris': 'Dog',
+                          'Pan_troglodytes': 'Chimp',
+                          'Macaca_mulatta': 'Macaca'}
+
+        if mworkers:
+            nthreadsx = nthreads
+            self._multprocsinfile = True
+            tot = len(fasta)
+            nthreads = 1
+        else:
+            tot = int(len(fasta) / nthreads)
+
+        if unspliced:
+            # Get all transcript IDs
+            for count in range(tot):
+                self.logger.info(fasta)
+                with Pool(nthreads) as p:
+                    trans = p.map(idsfun, fasta)
+
+            # Query ENSEMBL for all sequences for all IDs and create fasta file
+
+            if mworkers:
+                nthreads = nthreadsx
+                tot = int(len(trans[0]) / nthreads)
+                trans = iter(trans[0])
+                length = [tot for i in range(nthreads)]
+                trans = [list(islice(trans, elem))
+                         for elem in length]
+
+            for count in range(tot):
+                with Pool(nthreads) as p:
+                    p.map(self.writeSeqs, trans)
+
+        # Build Indexes
+
+        files = [file.split('.')[0] for file in fasta]
+        path = files[0].split('/')[:-1]
+        path = ('/').join(path)
+        files = [file.split('/')[-1] for file in files]
+        files = ['all' + regularnamedic[file] +
+                 'UnsplicedGene.v55' for file in files]
+
+        inputs = [(file, path + '/' + file + '.fa') for file in files]
+
+        # Combine files if needed
+
+        if mworkers:
+            inputs = inputs[0]
+            subprocess.call('cat ' + inputs + '*' + '> ' + inputs)
+
+        self.logger.info('Attempting to Build indexes...')
+
+        for count in range(tot):
+            with Pool(nthreads) as p:
+                p.map(self.createIndexes, inputs)
+
     @ExceptionLogger('logger', KeyError, hlr.ch, '_loggermsg')
-    def buildBowtieIndexesfromEnsemblGenomicSeq(self, typeseq, species,
-                                                nthreads=1, indexdir=None,
-                                                tmpdir='/tmp/', download=True,
+    def buildBowtieIndexesfromEnsemblGenomicSeq(self, typeseq, species, idsfun,
+                                                nthreads=1,
+                                                indexdir=None, tmpdir='/tmp/',
+                                                download=True,
+                                                unspliced=True,
+                                                mworkers=False,
                                                 fun='', ntries=2):
         """
         Get type genomic sequences directly from the ENSEMBL ftp site and
         use bowtie to create all the indexes from this sequences
         """
 
+        # TODO: gunzip and gz are the only recognizable decompressor
+        # and format, change to a dictionary of decompressor and fomats
+
+        typeseqdic = {'cdna': 'all',
+                      'dna': 'toplevel'}
+
+        specdbdic = {'Mus_musculus': 'GRCm38',
+                     'Rattus_norvegicus': 'Rnor_6.0',
+                     'Homo_sapiens': 'GRCh38',
+                     'Canis_familiaris': 'CanFam3.1',
+                     'Pan_troglodytes': 'Pan_tro_3.0',
+                     'Macaca_mulatta': 'Mmul_10'}
+
+        regularnamedic = {'Mus_musculus': 'Mouse',
+                          'Rattus_norvegicus': 'Rat',
+                          'Homo_sapiens': 'Human',
+                          'Canis_familiaris': 'Dog',
+                          'Pan_troglodytes': 'Chimp',
+                          'Macaca_mulatta': 'Macaca'}
+
+        if indexdir is None:
+            indexdir = self._indexes
+
+        # Set everything in the right format (e.g Homo_sapiens, cdna)
+
+        if not(isinstance(species, list)):
+            species = [species]
+        if not(isinstance(typeseq, list)):
+            typeseq = [typeseq]
+
+        self.tmpdir = tmpdir
+
+        Species = [sp.capitalize() for sp in species]
+        typeseq = [ty.lower() for ty in typeseq]
+
+        files = [('.').join([sp, specdbdic[sp],
+                             tseq,
+                             typeseqdic[tseq], 'fa', 'gz'])
+                 for sp in Species for tseq in typeseq]
+        self.logger.info(files)
+
+        if mworkers:
+            tot = int(len(files))
+        else:
+            tot = int(len(files) / nthreads)
+
         if download:
             ftpsite = 'ftp://ftp.ensembl.org/pub/release-98/fasta/'
 
-            typeseqdic = {'cdna': 'all',
-                          'dna': 'toplevel'}
-
-            specdbdic = {'Mus_musculus': 'GRCm38',
-                         'Rattus_norvegicus': 'Rnor_6.0',
-                         'Homo_sapiens': 'GRCh38',
-                         'Canis_familiaris': 'CanFam3.1',
-                         'Pan_troglodytes': 'Pan_tro_3.0',
-                         'Macaca_mulatta': 'Mmul_10'}
-
-            if indexdir is None:
-                indexdir = self._indexes
-
-            # Set everything in the right format (e.g Homo_sapiens, cdna)
-
-            if not(isinstance(species, list)):
-                species = [species]
-            if not(isinstance(typeseq, list)):
-                species = [typeseq]
-
-            Species = [sp.capitalize() for sp in species]
-            typeseq = [ty.lower() for ty in typeseq]
-
-            files = [('.').join([sp, specdbdic[sp],
-                                 tseq,
-                                 typeseqdic[tseq], 'fa', 'gz'])
-                     for sp in Species for tseq in typeseq]
-            self.logger.info(files)
-
-            # Prepare urls to download and local file directories,
+            # Prepare urls to download on local file directories,
             # if decompressing function is given, add it
 
-            urls = [(tmpdir + files[i + 2 * j],
-                     ftpsite + ('/').join([sp, tseq]) + '/' + files[i + 2 * j],
+            stype = len(typeseq)
+
+            urls = [(tmpdir + files[i + stype * j],
+                     ftpsite + ('/').join([sp, tseq]) + '/' +
+                     files[i + stype * j],
                      fun, ntries)
                     for i, tseq in enumerate(typeseq)
                     for j, sp in enumerate(species)]
@@ -118,25 +342,48 @@ class BowtieService:
 
             self.logger.info('Attempting to download files...')
 
-            for count, sp in enumerate(species):
+            for count in range(tot):
                 index = count * nthreads
                 suburls = urls[index: index + nthreads]
                 self.logger.info(suburls)
                 utils.callParallelFetchUrl(suburls, nthreads)
 
-        # Move to index directory TODO: Fill this in and uncomment below
+        # Files have already been extracted
+
+        files = [tmpdir + file.replace('.gz', '') for file in files]
+
+        # Create FASTA files for each species unspliced
+        # DNA using cDNA fasta
+
+        self.createUnsplicedIndexesfromCDNAFasta(files, nthreads,
+                                                 idsfun, unspliced,
+                                                 mworkers)
+
+        # Move to index directory TODO: Fill this in
 
         # Build Bowtie Indexes
 
-        # self.logger.info('Attempting to Build indexes...')
+        name = ['all' + regularnamedic[specie] + 'cDNA.v55'
+                for specie in Species]
 
-        # for file in files:
-        #     self.buildIndex(file)
+        inputs = [(file, ffile) for (file, ffile) in zip(name, files)]
 
-    def buildIndex(self, fastafiles):
+        self.logger.info('Attempting to Build indexes...')
+
+        if mworkers:
+            nthreads = 1
+
+        for count in range(tot):
+            with Pool(nthreads) as p:
+                p.map(self.createIndexes, inputs)
+
+    def buildIndex(self, fastafiles, basename=''):
         """
         Groups basefiles and dumps bowtie build output
         """
+
+        if not(basename):
+            basename = self._basename
 
         if isinstance(fastafiles, str):
             basefiles = fastafiles
@@ -144,10 +391,10 @@ class BowtieService:
             basefiles = ','.join(fastafiles)
 
         prog = self._build
-        args = [basefiles, self._basename]
+        args = [basefiles, basename]
 
         self.logger.info('Running {} {}'.format(prog, ' '.join(args)))
-        utils.run(prog, args, fname='dump')
+        utils.run(prog, args, fname=basename + 'dump')
 
     def search(self, btype='sense', mismatch=2, input='', basename=''):
         """

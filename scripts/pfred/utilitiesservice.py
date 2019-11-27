@@ -28,7 +28,7 @@ class DownloadProgressBar(tqdm):
         self.update(b * bsize - self.n)
 
 
-@ExceptionLogger(None, URLError, hlr.ch, "")
+# @ExceptionLogger(None, URLError, hlr.ch, "")
 def download_url(url, output_path):
     with DownloadProgressBar(unit='B', unit_scale=True,
                              miniters=1, desc=url.split('/')[-1]) as t:
@@ -129,16 +129,19 @@ def createOutCsv(title, data, fname):
 @ExceptionLogger(None, URLError, hlr.ch, "")
 def FetchEntry(entry):
     path, uri, fun, ntries = entry
+    ntries = int(ntries)
+    print(entry)
     if not os.path.exists(path):
         try:
             download_url(uri, path)
-        except (urllib.error.ContentTooShortError) as e:
-            logger.info('Download error:', e.reason)
+        except (URLError) as e:
+            logger.info('Download error: ' + e.reason)
             if ntries > 0:
-                if hasattr(e, 'code') and 500 <= e.code < 600:
-                    # recursively retry 5xx HTTP errors
-                    entry = (path, uri, fun, ntries - 1)
-                    return FetchEntry(entry)
+                # if hasattr(e, 'code') and 500 <= e.code < 600:
+                logger.info('Trying again...')
+                # recursively retry 5xx HTTP errors
+                entry = (path, uri, fun, ntries - 1)
+                return FetchEntry(entry)
         if fun:
             run(fun, [path])
     return [path, fun]

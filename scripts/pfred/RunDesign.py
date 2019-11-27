@@ -214,11 +214,14 @@ def joinOligoOut(parser):
 
 def createBowtieIndexes(parser):
 
-    flags = ['-s', '-n', '-t', '-d', '-c', '-r', '-f']
+    flags = ['-s', '-n', '-t', '-d', '-u', '-m', '-c', '-r', '-f']
     desta = ['species', 'nthreads', 'seqtypes',
-             'download', 'decompress', 'ntries', 'tempdir']
+             'download', 'unspliced', 'mworkers',
+             'decompress', 'ntries', 'tempdir']
     helpa = ['Species regular names', 'number of parallel threads',
              'sequence types', 'should I download the sequence files',
+             'Should I build the unspliced sequence files',
+             'Use multiple workers to create one single fasta file',
              'Which tool to decompress', 'How many retries in case url \
              stops sending data', 'temp directory to store downloads']
 
@@ -230,9 +233,11 @@ def createBowtieIndexes(parser):
     seqtype = finput[2]
     seqtype = parser.listFromInput(seqtype, '', ',')
     download = finput[3]
-    dfun = finput[4]
-    ntries = finput[5]
-    tmpdir = finput[6]
+    unspliced = finput[4]
+    mworkers = finput[5]
+    dfun = finput[6]
+    ntries = finput[7]
+    tmpdir = finput[8]
 
     # Create data
 
@@ -242,9 +247,12 @@ def createBowtieIndexes(parser):
     logger.info(reqspfull)
     bow = bowtie.BowtieService('')
     bow.buildBowtieIndexesfromEnsemblGenomicSeq(seqtype,
-                                                reqspfull, nthreads,
+                                                reqspfull, seq.getIDsfromFasta,
+                                                nthreads,
                                                 tmpdir=tmpdir,
                                                 download=download,
+                                                unspliced=unspliced,
+                                                mworkers=mworkers,
                                                 fun=dfun,
                                                 ntries=ntries)
 

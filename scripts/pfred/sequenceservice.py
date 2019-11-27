@@ -225,18 +225,20 @@ class SeqService:
                     self.seqsdic[gid] = ''.join(sequence)
             return self.seqsdic
 
-    @ExceptionLogger("logger", ValueError, hlr.ch, "_loggermsg")
     def getIDsfromFasta(self, fasta):
         """
         Get ENSEMBL IDs from FASTA file and store in dictionary
         """
-
         trans = []
-
-        for line in open(fasta):
-            if line.startswith('>'):
-                tran = line.strip()
-                trans.append(tran[1:])
+        try:
+            for line in open(fasta):
+                if line.startswith('>'):
+                    tran = line.strip()
+                    tran = tran[1:]
+                    tran = tran.split(' ')
+                    trans.append(tran[0])
+        except ValueError as e:
+            self.logger.exception(str(e))
         return trans
 
     @ExceptionLogger("logger", ensembl_rest.HTTPError, hlr.ch, "_loggermsg")
@@ -323,7 +325,6 @@ class SeqService:
         """
         Gets FASTA sequences given stable ids
         """
-
         if isinstance(spids, str):
             spids = [spids]
 
