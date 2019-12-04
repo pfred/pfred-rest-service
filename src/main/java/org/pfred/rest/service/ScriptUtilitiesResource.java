@@ -7,6 +7,8 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.logging.Logger;
 import java.io.File;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -129,5 +131,27 @@ public class ScriptUtilitiesResource {
             return Response.status(Response.Status.BAD_REQUEST).entity(ex.getMessage()).build();
         }
         return Response.status(Response.Status.BAD_REQUEST).entity("Shell command run failed").build();
+    }
+
+    @GET
+    @Produces(value = MediaType.TEXT_PLAIN)
+    @Path(value = "appendToFile")
+    @ApiResponses(value = {
+        @ApiResponse(code = 200, message = "Run clean running directory successfully"),
+        @ApiResponse(code = 400, message = "Error occurred in running clean running directory")})
+    @ApiOperation(value = "Run clean run directory")
+    public Response appendToFile(@ApiParam(value = "Filename", required = true) @QueryParam("FileName") final String fileName,
+                                 @ApiParam(value = "Text", required = true) @QueryParam("Text") final String text,
+                                 @ApiParam(value = "Run Directory", required = true) @QueryParam("RunDirectory") final String runName){
+        String fullRunDirectory = ShellUtilities.prepareRunDir(runName);
+
+        try {
+            BufferedWriter out = new BufferedWriter(new FileWriter(fullRunDirectory + "/" + fileName, true));
+            out.write(text);
+            out.close();
+            return Response.status(Response.Status.OK).entity("OK").build();
+        } catch (Exception ex) {
+            return Response.status(Response.Status.BAD_REQUEST).entity(ex.getMessage()).build();
+        }
     }
 }
