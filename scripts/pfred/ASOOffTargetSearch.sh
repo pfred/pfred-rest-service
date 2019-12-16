@@ -3,6 +3,10 @@
 #source env.sh
 #echo "line2"
 
+# Flag file paco in case client gets 504 error
+
+[ -f paco.txt ] && rm paco.txt
+
 echo "run input test.txt"
 
 cat EnumerationResult.csv | cut -f 1,5 -d ','>foo.csv
@@ -31,3 +35,5 @@ head $OFILE
 
 cp EnumerationResult.csv outputSummaryBeforeMerge.csv
 cat outputSummaryBeforeMerge.csv|tr ',' '\t' |mergeEx.pl 1 1 antisenseOffTarget.out keepAll 1|tr '\t' ','>ASOOffTargetSearchResult.csv
+
+echo "paco" > paco.txt

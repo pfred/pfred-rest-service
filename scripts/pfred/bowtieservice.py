@@ -5,7 +5,6 @@ import time
 import requests
 import logging
 import textwrap
-# import glob
 import subprocess
 import csv
 import multiprocessing

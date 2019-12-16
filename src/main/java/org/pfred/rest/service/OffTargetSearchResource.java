@@ -66,11 +66,28 @@ public class OffTargetSearchResource {
             @ApiParam(value = "missMatches", required = true) @QueryParam("missMatches") final String missMatches) {
         String shellScript = "ASOOffTargetSearch.sh";
         String outputFile = "ASOOffTargetSearchResult.csv";
+        boolean success = false;
+
+
+        // String OFILE="antisenseOffTarget.out";
+        // shellScript = "asDNA_OffTargetSearch_bowtie.pl";
+        // asDNA_OffTargetSearch_bowtie.pl -s "$1" -g "$2" -t $type  -v "$3" $IFILE > $OFILE
+        // String command = shellScript + " -s " + species + " -g " + IDs + " -t sense -v " + missMatches + " test.txt >" + OFILE;
+
 
         String fullRunDirectory = ShellUtilities.prepareRunDir(runName);
         String command = shellScript + " " + species + " " + IDs + " " + missMatches;
 
-        boolean success = ShellUtilities.runCommandThroughShell(command, fullRunDirectory);
+        // This is cheating. We acknowledge empty species as a complete run result, just get the data, don't run the shell script
+
+        logger.info(species);
+
+        if (species == "paco"){
+            logger.info("Shell command Avoided, skipping...");
+            success = true;
+        }else{
+            success = ShellUtilities.runCommandThroughShell(command, fullRunDirectory);
+        }
 
         if (success) {
             logger.info("Shell command run successfully");
@@ -82,5 +99,30 @@ public class OffTargetSearchResource {
             }
         }
         return Response.status(Response.Status.BAD_REQUEST).entity("Shell command run failed").build();
+    }
+
+    @GET
+    @Produces(value = MediaType.TEXT_PLAIN)
+    @Path(value = "Check")
+    @ApiResponses(value = {
+        @ApiResponse(code = 200, message = "Run Check file existence successfully"),
+        @ApiResponse(code = 400, message = "Error occurred in running Check file existence")})
+    @ApiOperation(value = "Run Check file existence")
+    public Response runCheckFile(@ApiParam(value = "file", required = true) @QueryParam("File") final String file,
+                                          @ApiParam(value = "Run Directory", required = true) @QueryParam("RunDirectory") final String runName){
+        String outputFile = file;
+        boolean success = false;
+
+        String fullRunDirectory = ShellUtilities.prepareRunDir(runName);
+
+        logger.info(file);
+
+        try {
+            String result = ShellUtilities.readFileAsString(fullRunDirectory + "/" + outputFile);
+            logger.info(result);
+            return Response.status(Response.Status.OK).entity(result).build();
+        } catch (Exception ex) {
+            return Response.status(Response.Status.BAD_REQUEST).entity(ex.getMessage()).build();
+        }
     }
 }

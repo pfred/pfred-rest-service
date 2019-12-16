@@ -374,6 +374,8 @@ class SeqService:
         be called in a multiprocessing pool
         """
 
+        spids, ntries = spids
+
         if species is None:
             species = self._speciesobjs
 
@@ -390,7 +392,13 @@ class SeqService:
                 self.varsdic[spids] = ensembl_rest.overlap_id(spids,
                                                               params=optional)
             except ensembl_rest.HTTPError as e:
-                self.logger.exception(str(e))
+                if ntries > 0:
+                    self.logger.info("Server refused, trying again..." +
+                                     ntries)
+                    spids = (spids, ntries - 1)
+                    self.getVariations(spids)
+                else:
+                    self.logger.exception(str(e))
 
             self.logger.info(spids)
 

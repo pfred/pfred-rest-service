@@ -112,6 +112,7 @@ def getSeqTranscripts(parser):
     fasta = finput[1]
     outexon = finput[2]
     outvar = finput[3]
+    ntries = 15
 
     # Enumerate part
 
@@ -129,8 +130,13 @@ def getSeqTranscripts(parser):
 
     # Variations part
 
+    # trans = iter(transcripts)
+    trans = [(tran, ntries) for tran in transcripts]
+    # trans = [list(islice(trans, elem))
+    #          for elem in length]
+
     with Pool(len(transcripts)) as p:
-        p.map(seq.getVariations, transcripts)
+        p.map(seq.getVariations, trans)
 
     header = ['sequenceName', 'columnNumber', 'residueNumber', 'number',
               'RCOL', 'GCOL', 'BCOL', 'SYMBOL', 'name', 'snpId',
