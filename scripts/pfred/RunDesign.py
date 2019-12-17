@@ -13,10 +13,10 @@ from parserservice import ParserService
 from multiprocessing import Pool
 
 
-filehandler = False
+filehandler = True
 
 
-def prepareProjHandler(wfile=False, name='LogFile-pfred'):
+def prepareProjHandler(wfile=False, name='LogFile-pfred' + str(utils.pid())):
     # Define what the logger is going to be
 
     global logger
@@ -130,10 +130,7 @@ def getSeqTranscripts(parser):
 
     # Variations part
 
-    # trans = iter(transcripts)
     trans = [(tran, ntries) for tran in transcripts]
-    # trans = [list(islice(trans, elem))
-    #          for elem in length]
 
     with Pool(len(transcripts)) as p:
         p.map(seq.getVariations, trans)
