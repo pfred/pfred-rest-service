@@ -14,7 +14,7 @@ from itertools import chain
 from exceptionlogger import ExceptionLogger
 
 
-def logHandler(fname='LogFile-pfred', logfile=False):
+def logHandler(fname='LogFile-pfred' + str(os.getpid()), logfile=False):
     global logger
     hlr.logHandler(file=logfile, filename=fname)
     logger = ExceptionLogger.create_logger(hlr.ch,
@@ -28,7 +28,6 @@ class DownloadProgressBar(tqdm):
         self.update(b * bsize - self.n)
 
 
-# @ExceptionLogger(None, URLError, hlr.ch, "")
 def download_url(url, output_path):
     with DownloadProgressBar(unit='B', unit_scale=True,
                              miniters=1, desc=url.split('/')[-1]) as t:
