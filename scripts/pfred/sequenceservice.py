@@ -374,8 +374,6 @@ class SeqService:
         be called in a multiprocessing pool
         """
 
-        spids, ntries = spids
-
         if species is None:
             species = self._speciesobjs
 
@@ -385,6 +383,7 @@ class SeqService:
             optional = {'feature': vartype}
 
         if parallel:
+            spids, ntries = spids
             if isinstance(spids, list):
                 self.logger.exception(str(ValueError))
                 raise ValueError

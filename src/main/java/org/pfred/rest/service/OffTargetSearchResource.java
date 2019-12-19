@@ -111,11 +111,10 @@ public class OffTargetSearchResource {
     public Response runCheckFile(@ApiParam(value = "file", required = true) @QueryParam("File") final String file,
                                           @ApiParam(value = "Run Directory", required = true) @QueryParam("RunDirectory") final String runName){
         String outputFile = file;
-        boolean success = false;
 
         String fullRunDirectory = ShellUtilities.prepareRunDir(runName);
 
-        logger.info(file);
+        // logger.info(file);
 
         try {
             String result = ShellUtilities.readFileAsString(fullRunDirectory + "/" + outputFile);
