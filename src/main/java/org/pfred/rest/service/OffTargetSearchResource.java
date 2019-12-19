@@ -39,7 +39,16 @@ public class OffTargetSearchResource {
         String fullRunDirectory = ShellUtilities.prepareRunDir(runName);
         String command = shellScript + " " + species + " " + IDs + " " + missMatches;
 
-        boolean success = ShellUtilities.runCommandThroughShell(command, fullRunDirectory);
+        boolean success = false;
+
+        logger.info(species);
+
+        if (species == "paco"){
+            logger.info("Shell command Avoided, skipping...");
+            success = true;
+        }else{
+            success = ShellUtilities.runCommandThroughShell(command, fullRunDirectory);
+        }
 
         if (success) {
             logger.info("Shell command run successfully");

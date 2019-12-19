@@ -4,6 +4,10 @@
 #echo "line2"
 #echo "run input test.txt"
 
+# Flag file paco in case client gets 504 error
+
+[ -f paco.txt ] && rm paco.txt
+
 cat EnumerationResult.csv | cut -f 1,5 -d ','>foo.csv
 sed '1d' foo.csv |tr ',' '\t'> test.txt
 
@@ -31,3 +35,4 @@ head $OFILE
 cp EnumerationResult.csv outputSummaryBeforeMerge.csv
 cat outputSummaryBeforeMerge.csv|tr ',' '\t' |mergeEx.pl 1 1 siRNAOffTarget.out keepAll 1|tr '\t' ','>siRNAOffTargetSearchResult.csv
 
+echo "paco" > paco.txt
