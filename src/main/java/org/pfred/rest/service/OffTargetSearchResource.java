@@ -123,11 +123,11 @@ public class OffTargetSearchResource {
 
         String fullRunDirectory = ShellUtilities.prepareRunDir(runName);
 
-        // logger.info(file);
+        logger.info(file);
 
         try {
             String result = ShellUtilities.readFileAsString(fullRunDirectory + "/" + outputFile);
-            logger.info(result);
+            // logger.info(result);
             return Response.status(Response.Status.OK).entity(result).build();
         } catch (Exception ex) {
             return Response.status(Response.Status.BAD_REQUEST).entity(ex.getMessage()).build();
