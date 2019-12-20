@@ -419,7 +419,7 @@ class SeqService:
                     self.varsdic[spid] = list(filter(lambda var:
                                                      var['consequence_type'] !=
                                                      filtvalue, vars))
-                    self.logger.info(spids)
+                    self.logger.info(spid)
             except ensembl_rest.HTTPError as e:
                 self.logger.exception(str(e))
 
