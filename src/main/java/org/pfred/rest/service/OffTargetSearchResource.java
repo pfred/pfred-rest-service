@@ -130,6 +130,7 @@ public class OffTargetSearchResource {
             // logger.info(result);
             return Response.status(Response.Status.OK).entity(result).build();
         } catch (Exception ex) {
+            logger.info(ex.getMessage());
             return Response.status(Response.Status.BAD_REQUEST).entity(ex.getMessage()).build();
         }
     }
