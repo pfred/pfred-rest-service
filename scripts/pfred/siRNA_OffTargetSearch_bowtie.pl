@@ -46,6 +46,18 @@ if($opts{'s'}=~ /rat/i){
     #push @BOWTIE_SearchList, "RatcDNA.v55";
     push @BOWTIE_SearchList, & exportsiRNAIndexes("rat");
 }
+if($opts{'s'}=~ /dog/i){
+    #push @BOWTIE_SearchList, "RatcDNA.v55";
+    push @BOWTIE_SearchList, & exportsiRNAIndexes("dog");
+}
+if($opts{'s'}=~ /chimp/i){
+    #push @BOWTIE_SearchList, "RatcDNA.v55";
+    push @BOWTIE_SearchList, & exportsiRNAIndexes("chimp");
+}
+if($opts{'s'}=~ /macaque/i){
+    #push @BOWTIE_SearchList, "RatcDNA.v55";
+    push @BOWTIE_SearchList, & exportsiRNAIndexes("macaque");
+}
 
 #-----------------build bowtie input fasta file---------------------------#
 my $seqfile = pop @ARGV;

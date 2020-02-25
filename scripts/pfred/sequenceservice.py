@@ -365,7 +365,7 @@ class SeqService:
 
         return self.exondic
 
-    def getVariations(self, spids, parallel=True, filtvalue='intron_variant',
+    def getVariations(self, spids, parallel=False, filtvalue='intron_variant',
                       vartype=None, species=None):
         """
         Gets variation objects given stable ID,
@@ -449,7 +449,7 @@ class SeqService:
         return self.utrdic
 
     @ExceptionLogger("logger", ValueError, hlr.ch, "_loggermsg")
-    def assignExons(self, junctions):
+    def assignExons(self, junctions, trans):
         """
         Takes retrieved exonboundaries file and creates dictionaries
         of exon positions and names
@@ -466,6 +466,8 @@ class SeqService:
 
         for count, row in enumerate(junctions):
             target = row[0]
+            if not (target in trans):
+                continue
             residue = row[2]
             isutr = row[9]
             name = 'exon' + str(count)

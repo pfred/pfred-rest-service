@@ -492,6 +492,8 @@ class BowtieService:
 
         # Initialize the values for all transcripts
 
+        self.logger.info(transcripts)
+
         resetMatchDis(transcripts, transdic, target)
         idaux = target + '_1'
 
@@ -508,6 +510,8 @@ class BowtieService:
             for row in reader:
                 id = row[0]
                 trans = row[2]
+                if not(trans in transcripts):
+                    continue
                 matchr = row[7]
                 pos = int(row[3]) + 1
 

@@ -46,9 +46,17 @@ if($opts{'s'}=~ /rat/i){
     # push @BOWTIE_SearchList, "RatcDNA.v55","allRatUnsplicedGene.v55";
     push @BOWTIE_SearchList, & exportAntisenseIndexes("rat");
 }
-if($opts{'s'}=~ /macaca/i){
+if($opts{'s'}=~ /dog/i){
+    # push @BOWTIE_SearchList, "RatcDNA.v55","allRatUnsplicedGene.v55";
+    push @BOWTIE_SearchList, & exportAntisenseIndexes("dog");
+}
+if($opts{'s'}=~ /chimp/i){
+    # push @BOWTIE_SearchList, "RatcDNA.v55","allRatUnsplicedGene.v55";
+    push @BOWTIE_SearchList, & exportAntisenseIndexes("chimp");
+}
+if($opts{'s'}=~ /macaque/i){
     #push @BOWTIE_SearchList, "MacacacDNA.v58","allMacacaUnsplicedGene.v58";
-    push @BOWTIE_SearchList, & exportAntisenseIndexes("macaca");
+    push @BOWTIE_SearchList, & exportAntisenseIndexes("macaque");
 }
 $BOWTIE_option .=(($opts{'t'} =~ /antisense/i))? " --nofw -f":" --norc -f";
 

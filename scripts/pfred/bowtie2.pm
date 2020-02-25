@@ -17,7 +17,7 @@ my %AntisenseIndex=("human" => ["allHumancDNA.v55", "allHumanUnsplicedGene.v55"]
                     "rat"=>["allRatcDNA.v55","allRatUnsplicedGene.v55"],
                     "chimp"=>["allChimpcDNA.v55", "allChimpUnsplicedGene.v55"],
                     "dog"=>["allDogcDNA.v55", "allDogUnsplicedGene.v55"],
-                    "macaca"=>["allMacacacDNA.v55", "allMacacaUnsplicedGene.v55"]
+                    "macaque"=>["allMacacacDNA.v55", "allMacacaUnsplicedGene.v55"]
     );
 
 my %siRNAIndex=("human" => ["allHumancDNA.v55"],
@@ -25,7 +25,7 @@ my %siRNAIndex=("human" => ["allHumancDNA.v55"],
                 "rat"=>["allRatcDNA.v55"],
                 "chimp"=>["allChimpcDNA.v55"],
                 "dog"=>["allDogcDNA.v55"],
-                "macaca"=>["allMacacacDNA.v55"]
+                "macaque"=>["allMacacacDNA.v55"]
     );
 
 sub exportEnv

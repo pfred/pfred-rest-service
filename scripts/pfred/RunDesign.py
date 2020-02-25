@@ -151,22 +151,25 @@ def callBowtieEnumerate(parser):
 
     # Parse input
 
-    flags = ['-p', '-l', '-f', '-o']
-    desta = ['target', 'oligolen', 'fastafile', 'outfile']
+    flags = ['-p', '-l', '-f', '-o', '-t']
+    desta = ['target', 'oligolen', 'fastafile', 'outfile', 'trans']
     helpa = ['Target ID',
              'Oligo Length',
              'FASTA file',
-             'out file']
+             'out file',
+             'transcripts']
 
     finput = prepareInput(parser, flags, desta, helpa)
     target = finput[0]
     oligolen = int(finput[1])
     fasta = finput[2]
     outf = finput[3]
+    transcripts = finput[4]
+    transcripts = parser.listFromInput(transcripts, '', ',')
 
     seq = sequenceservice.SeqService()
     seqdic = seq.getSeqsfromFasta(fasta, target)
-    transcripts = seq.getIDsfromFasta(fasta)
+    # transcripts = seq.getIDsfromFasta(fasta)
 
     header = ['name', 'start', 'end', 'length', 'parent_dna_oligo',
               'parent_sense_oligo', 'parent_antisense_oligo', 'target_name']
@@ -192,22 +195,24 @@ def joinOligoOut(parser):
 
     # Parse input
 
-    flags = ['-l', '-j', '-v', '-o']
-    desta = ['oligoout', 'exonboundaries', 'variation', 'output']
+    flags = ['-l', '-j', '-v', '-o', '-t']
+    desta = ['oligoout', 'exonboundaries', 'variation', 'output', 'trans']
     helpa = ['Oligo output from Bowtie',
              'Exon boundaries out',
              'Variation file',
-             'Output summary file']
+             'Output summary file',
+             'transcripts']
 
     finput = prepareInput(parser, flags, desta, helpa)
     oligout = finput[0]
     exonfile = finput[1]
     variation = finput[2]
     outf = finput[3]
+    trans = finput[4]
 
     seq = sequenceservice.SeqService()
     [file, reader] = utils.readAnnotationCsv(exonfile)
-    seq.assignExons(reader)
+    seq.assignExons(reader, trans)
     file.close()
     [file, reader] = utils.readAnnotationCsv(variation)
     seq.assignSNPs(reader)
