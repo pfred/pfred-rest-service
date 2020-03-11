@@ -30,7 +30,7 @@ Getopt::Std::getopt('stgvh', \%opts);
 if($opts{'h'} || @ARGV<1 ){ die $usage;} # print help
 #--------set bowtie mismatch ------------------------------------#
 my $mismatch=($opts{'v'}=~ /[0-3]/)? $opts{'v'} : 2;
-$BOWTIE_option .=" -v $mismatch --large-index";
+$BOWTIE_option .=" -v $mismatch";
 
 #---------build bowtie search list--------------------------------#
 
@@ -99,7 +99,7 @@ for (my $i=0; $i< @BOWTIE_SearchList; $i++){
     $bowtie_out="${bowtie_in}_${db}.out";
     $bowtie_noAlign="${bowtie_in}_${db}.noAlign";
     print STDERR ("set BOWTIE_INDEXES $BOWTIE_INDEXES; $BOWTIE $BOWTIE_option --un $bowtie_noAlign $db $bowtie_in > $bowtie_out;\n");
-    system ("set BOWTIE_INDEXES $BOWTIE_INDEXES; $BOWTIE $BOWTIE_option --un $bowtie_noAlign $BOWTIE_INDEXES/$db $bowtie_in > $bowtie_out;");
+    system ("set BOWTIE_INDEXES $BOWTIE_INDEXES; $BOWTIE $BOWTIE_option --un $bowtie_noAlign $db $bowtie_in > $bowtie_out;");
     if (-f $bowtie_noAlign){
         #append no match to bowtie_out;
         open("NA", "<$bowtie_noAlign");
