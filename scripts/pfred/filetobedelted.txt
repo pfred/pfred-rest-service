@@ -1,0 +1,193 @@
+Tianhong Zhang, 4/24/2013
+doing something to this file
+
+sub loadSequences
+{
+my ($fileName)=@_;
+open (FH,$fileName);
+my @file=<FH>;
+my @fastaSeqs=();
+my $currSeq="";
+my $line="";
+my $seq="";
+for (my $i=0;$i<@file;$i++){
+    $line=$file[$i];
+    if ($i==0){
+      $seq=$line;
+     }
+    elsif ($i!=0 && $line=~/^\>/){
+      push(@fastaSeqs,$seq);
+      $seq="";
+      $seq=$line;
+    }
+   else{
+       $seq=$seq.$line;
+     }
+}
+push(@fastaSeqs,$seq);
+close(FH);
+return(@fastaSeqs);
+}
+
+//inserting something on line 32
+
+###################
+#For a single sequence
+#Return the sequence portion 
+#as a string
+##########################
+sub getSequence{
+my (@seq)=@_;
+shift(@seq);
+my $fullSeq=join("",@seq);
+return $fullSeq;
+}
+
+########################3
+#get sequence for a specified name
+###################################
+sub getSequenceByName{
+my ($name,@sequences)=@_;
+my $index=&getIndexForSequenceName($name,@sequences);
+my @fasta=split(/\n/,$sequences[$index]);
+
+}
+
+##############################
+#return index position for a
+#sequence name
+##############################
+sub getIndexForSequenceName{
+my ($name,@fastaSeqs)=@_;
+my @names=&getNames(@fastaSeqs);
+my $index=-1;
+for (my $i=0;$i<@names;$i++){
+    if($names[$i]=~/$name/){
+     $index=$i;
+     $i=@names;
+    }
+ }
+return $index;
+}
+
+
+#################
+#@seq is a single fasta seq where
+#each line is assigned to an element
+sub subStrOfSeq
+{
+my($start,$stop,@seq)=@_;
+$stop=$stop-$start;
+$start--;
+$stop++;
+#print STDERR "$start\,*$stop* $seq[0]\n";
+my $header=$seq[0];
+shift(@seq);
+my $fullSeq=join("",@seq);
+$fullSeq=~s/\s//g;
+my $subSeq=substr($fullSeq,$start,$stop);
+my (@newSeq)=($header,$subSeq);
+
+return @newSeq;
+}
+
+
+#################
+#get length for a single seq where
+#@seq is a single fasta seq where
+#each line is assigned to an element
+sub getLength
+{
+my (@seq)=@_;
+shift(@seq);
+my $fullSeq=join("",@seq);
+$fullSeq=~s/\s//g;
+my $len=length($fullSeq);
+return($len);
+}
+
+#####################################
+#for each fastaseq in the array
+#return the lengths of the sequences
+
+sub getLengths{
+my (@fastaSeqs)=@_;
+my @lengths=();
+for (my $i=0;$i<@fastaSeqs;$i++){
+  my @lines=split(/\n/,$fastaSeqs[$i]);
+  my $seq="";
+  my $header="";
+  for (my $j=0;$j<@lines;$j++){
+     if($lines[$j]=~/^>/){
+       $header=$lines[$j]."\n";
+      }
+     else{
+      $seq=$seq.$lines[$j];
+     }
+    }
+ $lengths[$i]=length($seq);
+# print STDERR "$lengths[$i]\n";
+ }
+return @lengths;
+}
+
+#####################################
+#get names for each sequence
+#####################################
+sub getNames{
+my (@fastaSeqs)=@_;
+my $header="";
+my @names=();
+for (my $i=0;$i<@fastaSeqs;$i++){
+  my @lines=split(/\n/,$fastaSeqs[$i]);
+  for (my $j=0;$j<@lines;$j++){
+     if($lines[$j]=~/^>/){
+       $header=$lines[$j];
+       $header=~s/\>//g;
+       push(@names,$header);
+      }
+   }
+//Tianhong, making some changes in the demo branch, not the master branch
+//try to push to remote repository later
+return @names;
+}
+################################
+#for each sequence, 
+#reverse the sequence without complementing
+################################
+sub reverseSequences{
+my (@fastaSeqs)=@_;
+my @newFasta=();
+for (my $i=0;$i<@fastaSeqs;$i++){
+    my @lines=split(/\n/,$fastaSeqs[$i]);
+    my $seq="";
+    my $header="";
+    for (my $j=0;$j<@lines;$j++){
+      if($lines[$j]=~/^>/){
+        $header=$lines[$j]."\n";
+       }
+      else{
+       $seq=$seq.$lines[$j];
+      }
+     }
+   my $newSeq=reverse($seq);
+   push(@newFasta,$header.$newSeq);
+  }
+@newFasta=&formatNumberOfLetters(60,@newFasta);
+return @newFasta;
+}
+
+sub getGcContentOverWindow{
+my ($winSize,@fastaSeqs)=@_;
+my @lengths=&getLengths(@fastaSeqs);
+my @names=&getNames(@fastaSeqs);
+my @gc=();
+for (my $i=0;$i<@names;$i++){
+     #$gc[0][$i+1]=$names[$i];
+     $gc[$i+1][0]=$names[$i];
+  }
+my $maxCols=0;
+for (my $i=0;$i<@fastaSeqs;$i++){
+   my @lines=split(/\n/,$fastaSeqs[$i]);
+   my $seq="";
+ 
